@@ -107,8 +107,10 @@ function insertPayment($mysqli, $faker, $user_id) {
     $query = "INSERT INTO payment (user_id, payment_method, payment_info) VALUES ($user_id, '$payment_method', '$payment_info')";
     if ($mysqli->query($query)) {
         echo "Méthode de paiement ajoutée avec succès\n";
+        return $mysqli->insert_id; // Retourner l'ID du paiement ajouté
     } else {
         echo "Erreur lors de l'ajout de la méthode de paiement: " . $mysqli->error . "\n";
+        return null;
     }
 }
 
@@ -131,12 +133,12 @@ function insertProduct($mysqli, $faker) {
 }
 
 // Fonction pour insérer une facture
-function insertInvoices($mysqli, $faker, $user_id, $command_id) {
+function insertInvoices($mysqli, $faker, $user_id, $command_id, $payment_id) {
     $total = rand(20, 100); // Générer un total de facture aléatoire
     $created_date = $faker->date; // Générer une date aléatoire pour la facture
 
-    $query = "INSERT INTO invoices (user_id, command_id, total, created_date) 
-              VALUES ($user_id, $command_id, $total, '$created_date')";
+    $query = "INSERT INTO invoices (user_id, command_id, total, created_date, payment_id) 
+              VALUES ($user_id, $command_id, $total, '$created_date', $payment_id)";
     
     if ($mysqli->query($query)) {
         echo "Facture ajoutée pour l'utilisateur $user_id et la commande $command_id\n";
@@ -144,7 +146,6 @@ function insertInvoices($mysqli, $faker, $user_id, $command_id) {
         echo "Erreur lors de l'ajout de la facture: " . $mysqli->error . "\n";
     }
 }
-
 
 // Fonction pour insérer des articles dans le panier
 function insertProductCart($mysqli, $faker, $cart_id, $product_ids) {
@@ -162,7 +163,6 @@ function insertProductCart($mysqli, $faker, $cart_id, $product_ids) {
     }
 }
 
-
 // Insérer des produits au début
 $product_ids = [];
 for ($i = 0; $i < 10; $i++) { // Ajouter 10 produits
@@ -171,7 +171,6 @@ for ($i = 0; $i < 10; $i++) { // Ajouter 10 produits
         $product_ids[] = $product_id;
     }
 }
-
 
 // Insérer des factures pour chaque commande
 for ($i = 0; $i < 10; $i++) {
@@ -182,25 +181,22 @@ for ($i = 0; $i < 10; $i++) {
         if ($cart_id) {
             insertCommand($mysqli, $user_id, $cart_id);
         }
-        insertPhoto($mysqli, $faker, $user_id);
-        insertPayment($mysqli, $faker, $user_id);
+        insertPhoto($mysqli, $faker, $user_id, $product_ids[array_rand($product_ids)]);
 
-        // Évaluer un produit existant aléatoire
-        $random_product_id = $faker->randomElement($product_ids);
-        insertRate($mysqli, $faker, $user_id, $random_product_id);
+        // Insérer une méthode de paiement et récupérer l'ID
+        $payment_id = insertPayment($mysqli, $faker, $user_id);
+        if ($payment_id) {
+            // Assurer que la facture est liée à une méthode de paiement valide
+            insertInvoices($mysqli, $faker, $user_id, $cart_id, $payment_id);
+        }
 
-        // Insérer une facture pour chaque commande
-        insertInvoices($mysqli, $faker, $user_id, $cart_id);
+        insertRate($mysqli, $faker, $user_id, $product_ids[array_rand($product_ids)]);
 
-        // Ajouter les produits dans le panier
-        $product_ids = array_slice($product_ids, 0, rand(1, 5)); // Sélectionner des produits aléatoires
-        insertProductCart($mysqli, $faker, $cart_id, $product_ids); // Ajouter les produits au panier
-    
+        // Ajouter des produits aléatoires au panier
+        insertProductCart($mysqli, $faker, $cart_id, $product_ids);
+        
     }
 }
 
-
-// Fermer la connexion à la base de données
 $mysqli->close();
-
 ?>
